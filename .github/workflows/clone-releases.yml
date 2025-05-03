@@ -10,7 +10,7 @@ jobs:
   clone:
     runs-on: ubuntu-latest
     steps:
-      - uses: andrew-the-techie/gha-clone-releases@v1
+      - uses: andrewthetechie/gha-clone-releases@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           src_repo: "iAJue/MoeKoeMusic"
