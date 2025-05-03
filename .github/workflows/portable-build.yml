@@ -1,0 +1,51 @@
+name: Build Portable Version
+
+on:
+  # 支持手动触发
+  workflow_dispatch:
+  # 也支持在推送到 main 分支时触发
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  build-portable:
+    name: Build Portable for Windows
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm run install-all
+
+      - name: Run common build
+        run: npm run build
+
+      - name: Build API for Windows
+        run: npm run build:api:win
+
+      - name: Build portable Windows version
+        run: npm run electron:build -- --win --portable --publish never
+
+      - name: Rename portable artifact
+        run: |
+          # 假设生成的便携式文件名为 MoeKoe Music-portable.exe
+          mv "./dist_electron/MoeKoe Music-portable.exe" "./MoeKoe_Music_${{ github.sha }}-portable.exe"
+
+      - name: Upload portable artifact to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          name: "Portable Release ${{ github.sha }}"
+          files: |
+            ./MoeKoe_Music_${{ github.sha }}-portable.exe    
