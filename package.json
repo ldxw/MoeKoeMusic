@@ -72,6 +72,13 @@
             "ia32"
           ]
         }
+        {
+          "target": "portable",
+          "arch": [
+            "x64",
+            "ia32"
+          ]
+        }
       ],
       "artifactName": "MoeKoe_Music_Setup_v${version}.${ext}"
     },
