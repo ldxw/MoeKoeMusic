@@ -25,6 +25,9 @@
     "pkglinux": "pkg . -t node14-linux-x64 -C GZip -o bin/app_linux --no-bytecode",
     "pkgmacos": "pkg . -t node14-macos-x64 -C GZip -o bin/app_macos --no-bytecode"
   },
+  "devDependencies": {
+    "pkg": "^5.3.0"  // 新增依赖
+  },
   "engines": {
     "node": ">=12"
   },
