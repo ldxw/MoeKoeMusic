@@ -91,11 +91,15 @@ jobs:
 
       - name: Run Windows build
         run: npm run electron:build:win
+        
+      - name: Generate portable Windows EXE
+        run: npm run electron:build -- --win --portable
 
       - name: Rename Windows artifact
         run: |
           mv "./dist_electron/MoeKoe_Music_Setup_${{ needs.increment-version.outputs.version }}.exe" "./MoeKoe_Music_Setup_${{ needs.increment-version.outputs.version }}.exe"
           mv "./dist_electron/MoeKoe_Music_Setup_${{ needs.increment-version.outputs.version }}.exe.blockmap" "./MoeKoe_Music_Setup_${{ needs.increment-version.outputs.version }}.exe.blockmap"
+          mv "./dist_electron/MoeKoe Music-portable.exe" "./MoeKoe_Music_${{ needs.increment-version.outputs.version }}-portable.exe"
           mv "./dist_electron/latest.yml" "./latest.yml"
 
       - name: Upload Windows artifact to GitHub Release
@@ -107,6 +111,7 @@ jobs:
           files: |
             ./MoeKoe_Music_Setup_${{ needs.increment-version.outputs.version }}.exe
             ./MoeKoe_Music_Setup_${{ needs.increment-version.outputs.version }}.exe.blockmap
+            ./MoeKoe_Music_${{ needs.increment-version.outputs.version }}-portable.exe
             ./latest.yml
 
   # macOS 端打包并上传到 GitHub Release
