@@ -1,0 +1,19 @@
+name: Clone Releases
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  clone:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: andrew-the-techie/gha-clone-releases@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          src_repo: "iAJue/MoeKoeMusic"
+          dest_repo: "ldxw/MoeKoeMusic"
+          copy_assets: true
+    
