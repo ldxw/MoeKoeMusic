@@ -1,51 +1,62 @@
 name: Build Portable Version
 
 on:
-  # 支持手动触发
+  # 手动触发（在 GitHub 网页端操作）
   workflow_dispatch:
-  # 也支持在推送到 main 分支时触发
+    inputs:
+      version:
+        description: "Optional: Specify version (e.g., v1.4.6)"
+        required: false
+  # 自动触发：当推送到 main 分支且提交信息包含 "portable" 关键词时
   push:
     branches:
       - main
+    paths:
+      - "package.json"
+      - "electron/**"
+      - "build/**"
+      - ".github/workflows/portable-build.yml"
+    # 可选：通过提交信息触发（如包含 "[build-portable]"）
+    # patterns:
+    #   - '**[build-portable]'
 
 permissions:
   contents: write
+  packages: write
 
 jobs:
   build-portable:
-    name: Build Portable for Windows
+    name: Build Windows Portable Version
     runs-on: windows-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v2
+        uses: actions/checkout@v4
         with:
-          node-version: '18'
+          fetch-depth: 0  # 获取完整历史（如需生成 changelog）
+
+      - name: Set up Node.js 18.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
 
       - name: Install dependencies
-        run: npm run install-all
+        run: npm ci  # 使用 package-lock.json 安装依赖，比 npm install 更稳定
 
-      - name: Run common build
-        run: npm run build
+      - name: Build API for Windows (如有需要)
+        run: npm run build:api:win  # 对应 package.json 中的 scripts 配置
 
-      - name: Build API for Windows
-        run: npm run build:api:win
+      - name: Build Portable Version (通过配置文件生成)
+        run: npm run electron:build:win  # 调用配置好的构建脚本，不再需要 --portable 参数
 
-      - name: Build portable Windows version
-        run: npm run electron:build -- --win --portable --publish never
+      - name: List build outputs
+        run: dir dist_electron  # 调试用，查看生成的文件
 
-      - name: Rename portable artifact
-        run: |
-          # 假设生成的便携式文件名为 MoeKoe Music-portable.exe
-          mv "./dist_electron/MoeKoe Music-portable.exe" "./MoeKoe_Music_${{ github.sha }}-portable.exe"
-
-      - name: Upload portable artifact to GitHub Release
+      - name: Upload to GitHub Releases
         uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')  # 仅在打标签时上传（可选）
         with:
-          tag_name: ${{ github.sha }}
+          tag_name: ${{ github.ref_name }}
           token: ${{ secrets.GITHUB_TOKEN }}
-          name: "Portable Release ${{ github.sha }}"
           files: |
-            ./MoeKoe_Music_${{ github.sha }}-portable.exe    
+            dist_electron/**/*portable*  # 匹配便携式产物（如 .exe 或目录）
+          overwrite: true  # 覆盖同名文件（可选）
