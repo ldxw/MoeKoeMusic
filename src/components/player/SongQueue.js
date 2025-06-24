@@ -89,9 +89,8 @@ export default function useSongQueue(t, musicQueueStore) {
                     musicQueueStore.addSong(song);
                 }
             } else {
-                const updatedQueue = [...musicQueueStore.queue];
-                updatedQueue[existingSongIndex] = song;
-                musicQueueStore.setQueue(updatedQueue);
+                // 如果歌曲已存在，只更新当前歌曲的信息，不修改队列
+                currentSong.value = song;
             }
 
             // 返回歌曲对象
@@ -169,9 +168,8 @@ export default function useSongQueue(t, musicQueueStore) {
                     musicQueueStore.addSong(song);
                 }
             } else {
-                const updatedQueue = [...musicQueueStore.queue];
-                updatedQueue[existingSongIndex] = song;
-                musicQueueStore.setQueue(updatedQueue);
+                // 如果歌曲已存在，只更新当前歌曲的信息，不修改队列
+                currentSong.value = song;
             }
 
             // 返回歌曲对象
@@ -298,6 +296,12 @@ export default function useSongQueue(t, musicQueueStore) {
         return queueSongs;
     };
 
+    // 获取歌曲详情
+    const privilegeSong = async (hash) => {
+        const response = await get(`/privilege/lite`,{hash:hash});
+        return response;
+    }
+
     return {
         currentSong,
         NextSong,
@@ -306,6 +310,7 @@ export default function useSongQueue(t, musicQueueStore) {
         addToNext,
         getPlaylistAllSongs,
         addPlaylistToQueue,
-        addCloudPlaylistToQueue
+        addCloudPlaylistToQueue,
+        privilegeSong
     };
 } 

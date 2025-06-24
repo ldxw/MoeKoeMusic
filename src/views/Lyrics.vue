@@ -122,6 +122,21 @@ const currentLineStyle = computed(() => ({
     transform: `translateX(${currentLineScrollX.value}px)`
 }))
 
+const throttle = (func, delay) => {
+    let lastTime = 0
+    return (...args) => {
+        const now = Date.now()
+        if (now - lastTime >= delay) {
+            lastTime = now
+            func(...args)
+        }
+    }
+}
+
+const sendWindowDrag = throttle((mouseX, mouseY) => {
+    window.electron.ipcRenderer.send('window-drag', { mouseX, mouseY })
+}, 16)
+
 const displayedLines = ref([0, 1]) 
 const defaultColor = ref(localStorage.getItem('lyrics-default-color') || '#999999')
 const highlightColor = ref(localStorage.getItem('lyrics-highlight-color') || 'var(--primary-color)')
@@ -281,10 +296,7 @@ const onDrag = (event) => {
     const deltaX = event.screenX - dragOffset.value.x
     const deltaY = event.screenY - dragOffset.value.y
 
-    window.electron.ipcRenderer.send('window-drag', {
-        mouseX: deltaX,
-        mouseY: deltaY
-    })
+    sendWindowDrag(deltaX, deltaY)
 }
 
 const endDrag = () => {
@@ -395,14 +407,16 @@ html {
 <style scoped>
 .character {
     display: inline-block;
-    color: transparent;
     position: relative;
     margin: 0 2px;
     background-clip: text;
     -webkit-background-clip: text;
-    color: transparent;
     font-weight: bold;
     letter-spacing: 2px;
+    background-image: linear-gradient(to right, #ff0000, #00ff00);
+    filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.3));
+    color: transparent;
+    transition: all 0.3s ease;
 }
 
 .lyrics-container {

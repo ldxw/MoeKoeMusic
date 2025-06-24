@@ -19,6 +19,7 @@
   "sheng-yin": "音",
   "tou-ding-lv": "ミントグリーン",
   "wai-guan": "外観",
+  "native-title-bar":"ネイティブタイトルバー",
   "xian-shi-ge-ci-bei-jing": "フルスクリーンの歌詞の背景カバーを表示します",
   "xian-shi-zhuo-mian-ge-ci": "デスクトップの歌詞を表示する",
   "xiao": "小さい",
@@ -189,5 +190,7 @@
   "kui-she-chao-qing-yin-zhi": "Viper Ultra-definition Sound Quality",
   "hires-yin-zhi": "高解像度の音質",
   "tian-jia-wo-xi-huan": "私のお気に入りに追加してください",
-  "qie-huan-bo-fang-mo-shi": "再生モードを切り替えます"
+  "qie-huan-bo-fang-mo-shi": "再生モードを切り替えます",
+  "pwa-app": "PWA アプリケーション",
+  "install": "インストール"
 }

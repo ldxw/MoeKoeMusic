@@ -1,4 +1,4 @@
-import { app, BrowserWindow, screen, Tray, Menu, globalShortcut, dialog, shell } from 'electron';
+import { app, ipcMain, BrowserWindow, screen, Tray, Menu, TouchBar, globalShortcut, dialog, shell, nativeImage } from 'electron';
 import path from 'path';
 import { spawn } from 'child_process';
 import log from 'electron-log';
@@ -11,12 +11,15 @@ import { checkForUpdates } from './updater.js';
 import { Notification } from 'electron';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const store = new Store();
+const { TouchBarLabel, TouchBarButton, TouchBarGroup, TouchBarSpacer } = TouchBar;
 let mainWindow = null;
 let apiProcess = null;
 let tray = null;
 
 // 创建主窗口
 export function createWindow() {
+    const savedConfig = store.get('settings');
+    const useNativeTitleBar = savedConfig?.nativeTitleBar === 'on' ? true : false;
     const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
 
     const windowWidth = Math.min(1200, screenWidth * 0.8);
@@ -29,8 +32,9 @@ export function createWindow() {
         y: lastWindowState.y || Math.floor((screenHeight - windowHeight) / 2),
         minWidth: 890,
         minHeight: 750,
-        frame: false,
-        titleBarStyle: 'hiddenInset',
+        show: savedConfig?.startMinimized === 'on' ? false : true,
+        frame: useNativeTitleBar,
+        titleBarStyle: useNativeTitleBar ? 'default' : 'hiddenInset',
         autoHideMenuBar: true,
         webPreferences: {
             preload: path.join(__dirname, 'preload.cjs'),
@@ -63,6 +67,12 @@ export function createWindow() {
     mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
         console.error('Failed to load:', errorCode, errorDescription);
     });
+    
+    mainWindow.once('ready-to-show', () => {
+        if(savedConfig?.startMinimized === 'on'){
+            mainWindow.hide();
+        }
+    });
 
     mainWindow.webContents.on('did-finish-load', () => {
         console.log('Page Loaded Successfully');
@@ -84,7 +94,6 @@ export function createWindow() {
         setThumbarButtons(mainWindow);
     }
 
-    const savedConfig = store.get('settings');
     if (savedConfig?.desktopLyrics === 'on') {
         createLyricsWindow();
     }
@@ -120,7 +129,7 @@ export function createLyricsWindow() {
             nodeIntegration: false,
             sandbox: false,
             webSecurity: true,
-            backgroundThrottling: false, 
+            backgroundThrottling: false,
             zoomFactor: 1.0
         }
     });
@@ -138,22 +147,22 @@ export function createLyricsWindow() {
     }
 
     // 监听窗口移动事件，限制窗口位置
-    let moveTimer;
-    lyricsWindow.on('move', () => {
-        if (moveTimer) return;
-        moveTimer = setTimeout(() => {
-            const bounds = lyricsWindow.getBounds();
-            const { height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
-            if (bounds.y + bounds.height > screenHeight) {
-                lyricsWindow.setPosition(bounds.x, screenHeight - bounds.height);
-            }
-            if (bounds.y < 0) {
-                lyricsWindow.setPosition(bounds.x, 0);
-            }
-            clearTimeout(moveTimer);
-            moveTimer = null;
-        }, 3000);
-    });
+    // let moveTimer;
+    // lyricsWindow.on('move', () => {
+    //     if (moveTimer) return;
+    //     moveTimer = setTimeout(() => {
+    //         const bounds = lyricsWindow.getBounds();
+    //         const { height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
+    //         if (bounds.y + bounds.height > screenHeight) {
+    //             lyricsWindow.setPosition(bounds.x, screenHeight - bounds.height);
+    //         }
+    //         if (bounds.y < 0) {
+    //             lyricsWindow.setPosition(bounds.x, 0);
+    //         }
+    //         clearTimeout(moveTimer);
+    //         moveTimer = null;
+    //     }, 3000);
+    // });
 
     // 设置窗口置顶级别
     lyricsWindow.setAlwaysOnTop(true, 'screen-saver');
@@ -164,8 +173,8 @@ export function createLyricsWindow() {
 }
 
 // 创建托盘图标及菜单
-export function createTray(mainWindow, title='') {
-    if(tray && title) {
+export function createTray(mainWindow, title = '') {
+    if (tray && title) {
         tray.setToolTip(title);
         return tray;
     }
@@ -178,49 +187,49 @@ export function createTray(mainWindow, title='') {
 
     const contextMenu = Menu.buildFromTemplate([
         {
-            label: '项目主页', 
+            label: '项目主页',
             icon: isDev ? path.join(__dirname, '../build/icons/menu/home.png') : path.join(process.resourcesPath, 'icons', 'menu', 'home.png'),
             click: () => {
                 shell.openExternal('https://github.com/iAJue/');
             }
         },
         {
-            label: '反馈bug', 
+            label: '反馈bug',
             icon: isDev ? path.join(__dirname, '../build/icons/menu/bug.png') : path.join(process.resourcesPath, 'icons', 'menu', 'bug.png'),
             click: () => {
                 shell.openExternal('https://github.com/iAJue/MoeKoeMusic/issues');
             }
         },
         {
-            label: '上一首', 
-            icon: isDev ? path.join(__dirname, '../build/icons/menu/prev.png') : path.join(process.resourcesPath, 'icons', 'menu', 'prev.png'), accelerator: 'Alt+CommandOrControl+Left', 
+            label: '上一首',
+            icon: isDev ? path.join(__dirname, '../build/icons/menu/prev.png') : path.join(process.resourcesPath, 'icons', 'menu', 'prev.png'), accelerator: 'Alt+CommandOrControl+Left',
             click: () => {
                 mainWindow.webContents.send('play-previous-track');
             }
         },
         {
-            label: '暂停', accelerator: 'Alt+CommandOrControl+Space', 
+            label: '暂停', accelerator: 'Alt+CommandOrControl+Space',
             icon: isDev ? path.join(__dirname, '../build/icons/menu/play.png') : path.join(process.resourcesPath, 'icons', 'menu', 'play.png'),
             click: () => {
                 mainWindow.webContents.send('toggle-play-pause');
             }
         },
         {
-            label: '下一首', accelerator: 'Alt+CommandOrControl+Right', 
+            label: '下一首', accelerator: 'Alt+CommandOrControl+Right',
             icon: isDev ? path.join(__dirname, '../build/icons/menu/next.png') : path.join(process.resourcesPath, 'icons', 'menu', 'next.png'),
             click: () => {
                 mainWindow.webContents.send('play-next-track');
             }
         },
         {
-            label: '检查更新', 
+            label: '检查更新',
             icon: isDev ? path.join(__dirname, '../build/icons/menu/update.png') : path.join(process.resourcesPath, 'icons', 'menu', 'update.png'),
             click: () => {
                 checkForUpdates(false);
             }
         },
         {
-            label: '显示/隐藏', accelerator: 'CmdOrCtrl+Shift+S', 
+            label: '显示/隐藏', accelerator: 'CmdOrCtrl+Shift+S',
             icon: isDev ? path.join(__dirname, '../build/icons/menu/show.png') : path.join(process.resourcesPath, 'icons', 'menu', 'show.png'),
             click: () => {
                 if (mainWindow) {
@@ -233,7 +242,7 @@ export function createTray(mainWindow, title='') {
             }
         },
         {
-            label: '退出程序', accelerator: 'CmdOrCtrl+Q', 
+            label: '退出程序', accelerator: 'CmdOrCtrl+Q',
             icon: isDev ? path.join(__dirname, '../build/icons/menu/quit.png') : path.join(process.resourcesPath, 'icons', 'menu', 'quit.png'),
             click: () => {
                 app.isQuitting = true;
@@ -258,6 +267,89 @@ export function createTray(mainWindow, title='') {
         mainWindow.show();
     });
     return tray;
+}
+
+// 创建 TouchBar
+export function createTouchBar(mainWindow) {
+    const ICON_SIZE = 16;
+
+    let isPlaying = false;
+
+    const iconPath = (iconName) => {
+        const originalIcon = nativeImage.createFromPath(
+            isDev
+                ? path.join(__dirname, `../build/icons/${iconName}.png`)
+                : path.join(process.resourcesPath, "icons", `${iconName}.png`)
+        );
+
+        // 调整图标大小
+        return originalIcon.resize({
+            width: ICON_SIZE,
+            height: ICON_SIZE,
+        });
+    };
+
+    const prevButton = new TouchBarButton({
+        icon: iconPath("prev"),
+        iconPosition: "center",
+        click: () => {
+            mainWindow.webContents.send("play-previous-track");
+        },
+    });
+
+    const playPauseButton = new TouchBarButton({
+        icon: iconPath(isPlaying ? "pause" : "play"),
+        iconPosition: "center",
+        click: () => {
+            isPlaying = !isPlaying;
+            playPauseButton.icon = iconPath(isPlaying ? "pause" : "play");
+            mainWindow.webContents.send("toggle-play-pause");
+        },
+    });
+
+    const nextButton = new TouchBarButton({
+        icon: iconPath("next"),
+        iconPosition: "center",
+        click: () => {
+            mainWindow.webContents.send("play-next-track");
+        },
+    });
+
+    // 歌词
+    const lyricsLabel = new TouchBarLabel({
+        label: "暂无歌词",
+        textColor: "#FFFFFF",
+    });
+
+    const touchBar = new TouchBar({
+        items: [
+            prevButton,
+            new TouchBarSpacer({ size: "small" }),
+            playPauseButton,
+            new TouchBarSpacer({ size: "small" }),
+            nextButton,
+            new TouchBarSpacer({ size: "flexible" }),
+            lyricsLabel,
+            new TouchBarSpacer({ size: "flexible" }),
+        ],
+    });
+
+    mainWindow.setTouchBar(touchBar);
+
+    // 监听播放状态变化
+    ipcMain.on("play-pause-action", (event, playing) => {
+        isPlaying = playing;
+        playPauseButton.icon = iconPath(isPlaying ? "pause" : "play");
+    });
+
+    // 监听歌词更新
+    ipcMain.on("update-current-lyrics", (event, currentLyric) => {
+        if (currentLyric) {
+            lyricsLabel.label = currentLyric;
+        }
+    });
+
+    return touchBar;
 }
 
 // 启动 API 服务器
@@ -436,7 +528,7 @@ export function registerShortcut() {
         } else if (!settings?.shortcuts) {
             globalShortcut.register('Alt+Ctrl+D', clickFunc);
         }
-    } catch{
+    } catch {
         dialog.showMessageBox({
             type: 'error',
             title: '提示',
@@ -488,7 +580,7 @@ export function setThumbarButtons(mainWindow, isPlaying = false) {
     const buttons = [
         {
             tooltip: '上一首',
-            icon: isDev 
+            icon: isDev
                 ? path.join(__dirname, '../build/icons/prev.png')
                 : path.join(process.resourcesPath, 'icons', 'prev.png'),
             click: () => {
@@ -498,7 +590,7 @@ export function setThumbarButtons(mainWindow, isPlaying = false) {
         },
         {
             tooltip: '暂停',
-            icon: isDev 
+            icon: isDev
                 ? path.join(__dirname, '../build/icons/pause.png')
                 : path.join(process.resourcesPath, 'icons', 'pause.png'),
             click: () => {
@@ -508,7 +600,7 @@ export function setThumbarButtons(mainWindow, isPlaying = false) {
         },
         {
             tooltip: '下一首',
-            icon: isDev 
+            icon: isDev
                 ? path.join(__dirname, '../build/icons/next.png')
                 : path.join(process.resourcesPath, 'icons', 'next.png'),
             click: () => {
@@ -521,7 +613,7 @@ export function setThumbarButtons(mainWindow, isPlaying = false) {
     if (!isPlaying) {
         buttons[1] = {
             tooltip: '播放',
-            icon: isDev 
+            icon: isDev
                 ? path.join(__dirname, '../build/icons/play.png')
                 : path.join(process.resourcesPath, 'icons', 'play.png'),
             click: () => {
@@ -532,4 +624,94 @@ export function setThumbarButtons(mainWindow, isPlaying = false) {
     }
 
     mainWindow.setThumbarButtons(buttons);
+}
+
+// 处理自定义协议相关
+let hash = "";
+let listid = "";
+let protocolMainWindow = null;
+
+// 注册自定义协议
+export function registerProtocolHandler(mainWindow) {
+    const PROTOCOL = "moekoe";
+    
+    // 保存mainWindow引用
+    if (mainWindow) {
+        protocolMainWindow = mainWindow;
+    }
+    
+    // 注册协议
+    app.setAsDefaultProtocolClient(PROTOCOL, process.execPath);
+    
+    // 处理启动参数
+    handleArgv(process.argv);
+    
+    // 处理第二个实例的启动参数
+    app.on('second-instance', (event, commandLine) => {
+        if (protocolMainWindow) {
+            if (protocolMainWindow.isMinimized()) protocolMainWindow.restore();
+            protocolMainWindow.show();
+            protocolMainWindow.focus();
+            handleArgv(commandLine);
+        }
+    });
+    
+    // 在macOS平台特别处理open-url事件
+    if (process.platform === 'darwin') {
+        app.on('open-url', (event, urlStr) => {
+            event.preventDefault();
+            handleUrl(urlStr);
+        });
+    }
+    
+    return { 
+        getHash: () => hash,
+        handleProtocolArgv: handleArgv 
+    };
+}
+
+// 处理命令行参数
+function handleArgv(argv) {
+    const PROTOCOL = "moekoe";
+    const prefix = `${PROTOCOL}:`;
+    const url = argv.find(arg => arg.startsWith(prefix));
+    if (url) handleUrl(url);
+}
+
+// 处理URL
+function handleUrl(url) {
+    const urlObj = new URL(url);
+    
+    // 提取所有参数并更新全局变量
+    hash = urlObj.searchParams.get("hash") || "";
+    listid = urlObj.searchParams.get("listid") || "";
+    
+    // 根据路径和参数决定发送什么数据到渲染进程
+    if (protocolMainWindow && protocolMainWindow.webContents) {
+        // 将所有参数打包发送
+        protocolMainWindow.webContents.send('url-params', { 
+            hash,
+            listid,
+            urlPath: urlObj.pathname.substring(1) // 去掉前导斜杠
+        });
+    }
+}
+
+// 如果有从URL启动的hash参数，在页面加载完成后发送
+export function sendHashAfterLoad(mainWindow) {
+    if (mainWindow) {
+        protocolMainWindow = mainWindow;
+    }
+    
+    if ((hash || listid) && protocolMainWindow) {
+        protocolMainWindow.webContents.on('did-finish-load', () => {
+            setTimeout(() => {
+                protocolMainWindow.webContents.send('url-params', { 
+                    hash,
+                    listid,
+                    urlPath: 'share'
+                });
+            }, 1000);
+        });
+    }
 }

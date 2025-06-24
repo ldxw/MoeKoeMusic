@@ -19,6 +19,7 @@
   "sheng-yin": "聲音",
   "tou-ding-lv": "薄荷綠",
   "wai-guan": "外觀",
+  "native-title-bar":"使用原生窗口装饰器",
   "xian-shi-ge-ci-bei-jing": "顯示全屏歌詞背景封面",
   "xian-shi-zhuo-mian-ge-ci": "顯示桌面歌詞",
   "xiao": "小",
@@ -189,5 +190,7 @@
   "kui-she-chao-qing-yin-zhi": "蝰蛇超清音質",
   "hires-yin-zhi": "Hi-Res音質",
   "tian-jia-wo-xi-huan": "添加至我喜歡",
-  "qie-huan-bo-fang-mo-shi": "切換播放模式"
+  "qie-huan-bo-fang-mo-shi": "切換播放模式",
+  "pwa-app": "PWA應用程序",
+  "install": "安裝"
 }

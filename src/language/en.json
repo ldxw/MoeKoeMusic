@@ -19,6 +19,7 @@
   "sheng-yin": "sound",
   "tou-ding-lv": "mint green",
   "wai-guan": "Appearance",
+  "native-title-bar":"Use native window decoration",
   "xian-shi-ge-ci-bei-jing": "Show full screen lyrics background cover",
   "xian-shi-zhuo-mian-ge-ci": "Show desktop lyrics",
   "xiao": "Small",
@@ -189,5 +190,7 @@
   "kui-she-chao-qing-yin-zhi": "Viper ultra-definition sound quality",
   "hires-yin-zhi": "Hi-Res sound quality",
   "tian-jia-wo-xi-huan": "Add to my favorite",
-  "qie-huan-bo-fang-mo-shi": "Switch playback mode"
+  "qie-huan-bo-fang-mo-shi": "Switch playback mode",
+  "pwa-app": "PWA Application",
+  "install": "Install"
 }
