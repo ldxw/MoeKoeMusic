@@ -42,9 +42,8 @@ jobs:
           if [ "$USE_REMOTE" == "true" ]; then
             echo "🔍 检查远程版本是否存在: $VERSION"
             ARCHIVE_URL="https://github.com/iAJue/MoeKoeMusic/archive/refs/tags/${VERSION}.zip"
-            STATUS=$(curl -o /dev/null -s -w "%{http_code}" "$ARCHIVE_URL")
-            if [ "$STATUS" != "200" ]; then
-              echo "❌ 远程源码版本不存在: $ARCHIVE_URL"
+            if ! curl -f --head -L "$ARCHIVE_URL" > /dev/null 2>&1; then
+              echo "❌ 远程源码版本不存在或无法访问: $ARCHIVE_URL"
               exit 1
             fi
 
