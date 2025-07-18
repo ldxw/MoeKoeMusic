@@ -8,9 +8,10 @@ on:
         required: false
         default: "v1.4.8"
       use_remote:
-        description: "是否使用远程源码构建 (true = 下载 GitHub Release)"
+        description: "⬜ 勾选启用远程构建（默认使用本地源码）"
         required: false
-        default: "false"
+        default: false
+        type: boolean
 
 permissions:
   contents: read
