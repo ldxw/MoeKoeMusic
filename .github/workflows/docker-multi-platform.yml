@@ -4,9 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "镜像版本号 (默认: v1.4.7)"
+        description: "镜像版本号 (默认: v1.4.8)"
         required: false
-        default: "v1.4.7"
+        default: "v1.4.8"
+      use_remote:
+        description: "是否使用远程源码构建 (true = 下载 GitHub Release)"
+        required: false
+        default: "false"
 
 permissions:
   contents: read
@@ -18,19 +22,39 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
       - name: Set version and image tags
         id: vars
         run: |
-          VERSION=${{ github.event.inputs.version || 'v1.4.7' }}
+          VERSION=${{ github.event.inputs.version || 'v1.4.8' }}
           OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "TAG_DH_LATEST=ldxw/moekoe-music:latest" >> $GITHUB_OUTPUT
           echo "TAG_DH_VERSION=ldxw/moekoe-music:$VERSION" >> $GITHUB_OUTPUT
           echo "TAG_GHCR_LATEST=ghcr.io/$OWNER/moekoe-music:latest" >> $GITHUB_OUTPUT
           echo "TAG_GHCR_VERSION=ghcr.io/$OWNER/moekoe-music:$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Prepare source code
+        run: |
+          USE_REMOTE=${{ github.event.inputs.use_remote }}
+          VERSION=${{ github.event.inputs.version || 'v1.4.8' }}
+
+          if [ "$USE_REMOTE" == "true" ]; then
+            echo "🔍 检查远程版本是否存在: $VERSION"
+            ARCHIVE_URL="https://github.com/iAJue/MoeKoeMusic/archive/refs/tags/${VERSION}.tar.gz"
+            STATUS=$(curl -o /dev/null -s -w "%{http_code}" "$ARCHIVE_URL")
+            if [ "$STATUS" != "200" ]; then
+              echo "❌ 远程源码版本不存在: $ARCHIVE_URL"
+              exit 1
+            fi
+
+            echo "✅ 找到远程源码版本: $VERSION，开始下载..."
+            curl -L "$ARCHIVE_URL" -o source.tar.gz
+            mkdir src && tar -xzf source.tar.gz -C src --strip-components=1
+            echo "SOURCE_CONTEXT=src" >> $GITHUB_ENV
+          else
+            echo "📦 使用本地源码"
+            echo "SOURCE_CONTEXT=." >> $GITHUB_ENV
+          fi
 
       - name: Set up QEMU (for ARM emulation)
         uses: docker/setup-qemu-action@v3
@@ -54,7 +78,7 @@ jobs:
       - name: Build and Push Multi-Arch Image
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ${{ env.SOURCE_CONTEXT }}
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
