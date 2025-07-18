@@ -41,7 +41,7 @@ jobs:
 
           if [ "$USE_REMOTE" == "true" ]; then
             echo "🔍 检查远程版本是否存在: $VERSION"
-            ARCHIVE_URL="https://github.com/iAJue/MoeKoeMusic/archive/refs/tags/${VERSION}.tar.gz"
+            ARCHIVE_URL="https://github.com/iAJue/MoeKoeMusic/archive/refs/tags/${VERSION}.zip"
             STATUS=$(curl -o /dev/null -s -w "%{http_code}" "$ARCHIVE_URL")
             if [ "$STATUS" != "200" ]; then
               echo "❌ 远程源码版本不存在: $ARCHIVE_URL"
@@ -49,8 +49,9 @@ jobs:
             fi
 
             echo "✅ 找到远程源码版本: $VERSION，开始下载..."
-            curl -L "$ARCHIVE_URL" -o source.tar.gz
-            mkdir src && tar -xzf source.tar.gz -C src --strip-components=1
+            curl -L "$ARCHIVE_URL" -o source.zip
+            unzip -q source.zip
+            mv MoeKoeMusic-* src
             echo "SOURCE_CONTEXT=src" >> $GITHUB_ENV
           else
             echo "📦 使用本地源码"
