@@ -286,6 +286,27 @@ const { currentSong, NextSong, addSongToQueue, addCloudMusicToQueue, addToNext, 
 let autoSwitchTimer = null;
 // 恢复歌词正常滚动计时器
 let lyricScrollTimer = null;
+// 自动切换计数器和最大重试次数
+let autoSwitchCount = 0;
+const maxAutoSwitchRetries = 3;
+
+// 处理自动切换逻辑的函数
+const handleAutoSwitch = () => {
+    console.log('[PlayerControl] 检查自动切换重试次数:', autoSwitchCount, '/', maxAutoSwitchRetries);
+    if (autoSwitchCount < maxAutoSwitchRetries) {
+        autoSwitchCount++;
+        console.log(`[PlayerControl] 自动切换尝试 ${autoSwitchCount}/${maxAutoSwitchRetries}`);
+        autoSwitchTimer = setTimeout(() => {
+            playSongFromQueue('next');
+        }, 3000);
+        return true;
+    } else {
+        console.log('[PlayerControl] 已达到最大重试次数，停止自动切换');
+        window.$modal.alert('已达到最大重试次数，请手动选择歌曲');
+        autoSwitchCount = 0;
+        return false;
+    }
+};
 
 // 清除自动切换定时器的函数
 const clearAutoSwitchTimer = () => {
@@ -408,7 +429,7 @@ const togglePlayPause = async () => {
                     audio.src = song.url;
                 } else if (song.isCloud) {
                     console.log('[PlayerControl] 云音乐没有URL，重新获取');
-                    addCloudMusicToQueue(song.hash, song.name, song.author, song.timeLength);
+                    addCloudMusicToQueue(song.hash, song.name, song.author, song.timeLength, song.img);
                     return;
                 } else {
                     console.log('[PlayerControl] 歌曲没有URL，重新获取');
@@ -465,10 +486,8 @@ const playSongFromQueue = async (direction) => {
                 console.log('[PlayerControl] 获取到下一首歌曲，开始播放:', result.song.name);
                 await playSong(result.song);
             } else if (result && result.shouldPlayNext) {
-                console.log('[PlayerControl] 预定的下一首无法播放，3秒后自动切换下一首');
-                autoSwitchTimer = setTimeout(() => {
-                    playSongFromQueue('next');
-                }, 3000);
+                console.log('[PlayerControl] 预定的下一首无法播放');
+                handleAutoSwitch();
             } else {
                 console.error('[PlayerControl] 无法获取下一首歌曲信息');
             }
@@ -509,6 +528,7 @@ const playSongFromQueue = async (direction) => {
                 targetSong.name,
                 targetSong.author,
                 targetSong.timeLength,
+                targetSong.img,
                 false // 不重置播放位置，只获取URL
             );
         } else {
@@ -526,10 +546,8 @@ const playSongFromQueue = async (direction) => {
             console.log('[PlayerControl] 成功获取歌曲URL，开始播放:', result.song.name);
             await playSong(result.song);
         } else if (result && result.shouldPlayNext) {
-            console.log('[PlayerControl] 当前歌曲无法播放，3秒后自动切换到下一首');
-            autoSwitchTimer = setTimeout(() => {
-                playSongFromQueue('next');
-            }, 3000);
+            console.log('[PlayerControl] 云盘歌曲无法播放');
+            handleAutoSwitch();
         } else {
             console.error('[PlayerControl] 无法获取歌曲URL');
         }
@@ -538,7 +556,7 @@ const playSongFromQueue = async (direction) => {
         // 如果出错，尝试播放下一首
         if (direction === 'next') {
             console.log('[PlayerControl] 发生错误，3秒后尝试播放下一首');
-            setTimeout(() => playSongFromQueue('next'), 3000);
+            handleAutoSwitch();
         }
     }
 };
@@ -552,9 +570,21 @@ const handleRandomPlayback = (direction, currentIndex) => {
     } else if (direction === 'previous') {
         // 向前随机一首新歌曲
         let newIndex;
+        let attempts = 0;
+        const maxAttempts = musicQueueStore.queue.length * 2; // 防止死循环
+        
         do {
             newIndex = Math.floor(Math.random() * musicQueueStore.queue.length);
-        } while (playedSongsStack.value.length > 0 && newIndex === playedSongsStack.value[currentStackIndex.value]);
+            attempts++;
+            
+            // 如果尝试次数过多，直接返回
+            if (attempts >= maxAttempts) {
+                break;
+            }
+        } while (playedSongsStack.value.length > 0 && 
+                 (newIndex === playedSongsStack.value[currentStackIndex.value] ||
+                  (musicQueueStore.queue.length >= 10 && playedSongsStack.value.length > 0 && 
+                   playedSongsStack.value.slice(-Math.min(10, playedSongsStack.value.length)).includes(newIndex))));
 
         playedSongsStack.value.unshift(newIndex);
         return newIndex;
@@ -565,9 +595,21 @@ const handleRandomPlayback = (direction, currentIndex) => {
     } else if (direction === 'next') {
         // 随机一首新歌曲
         let newIndex;
+        let attempts = 0;
+        const maxAttempts = musicQueueStore.queue.length * 2; // 防止死循环
+        
         do {
             newIndex = Math.floor(Math.random() * musicQueueStore.queue.length);
-        } while (playedSongsStack.value.length > 0 && newIndex === playedSongsStack.value[currentStackIndex.value]);
+            attempts++;
+            
+            // 如果尝试次数过多，直接返回
+            if (attempts >= maxAttempts) {
+                break;
+            }
+        } while (playedSongsStack.value.length > 0 && 
+                 (newIndex === playedSongsStack.value[currentStackIndex.value] ||
+                  (musicQueueStore.queue.length >= 10 && playedSongsStack.value.length > 0 && 
+                   playedSongsStack.value.slice(-Math.min(10, playedSongsStack.value.length)).includes(newIndex))));
 
         // 截断未来的历史记录
         if (currentStackIndex.value < playedSongsStack.value.length - 1) {
@@ -890,10 +932,8 @@ defineExpose({
         if (result && result.song) {
             await playSong(result.song);
         } else if (result && result.shouldPlayNext) {
-            console.log('[PlayerControl] 歌曲无法播放，3秒后自动切换到下一首');
-            autoSwitchTimer = setTimeout(() => {
-                playSongFromQueue('next');
-            }, 3000);
+            console.log('[PlayerControl] 歌曲无法播放');
+            handleAutoSwitch();
         }
         return result;
     },
@@ -928,20 +968,18 @@ defineExpose({
         return songs;
     },
     addToNext,
-    addCloudMusicToQueue: async (hash, name, author, timeLength) => {
+    addCloudMusicToQueue: async (hash, name, author, timeLength, cover) => {
         clearAutoSwitchTimer();
 
         console.log('[PlayerControl] 外部调用addCloudMusicToQueue:', name);
         audio.pause();
         playing.value = false;
-        const result = await addCloudMusicToQueue(hash, name, author, timeLength);
+        const result = await addCloudMusicToQueue(hash, name, author, timeLength, cover);
         if (result && result.song) {
             await playSong(result.song);
-        } else if (result && result.shouldPlayNext) {
-            console.log('[PlayerControl] 云盘歌曲无法播放，3秒后自动切换到下一首');
-            autoSwitchTimer = setTimeout(() => {
-                playSongFromQueue('next');
-            }, 3000);
+    } else if (result && result.shouldPlayNext) {
+        console.log('[PlayerControl] 云盘歌曲无法播放');
+        handleAutoSwitch();
         }
         return result;
     },
@@ -965,6 +1003,7 @@ defineExpose({
                 queueSongs[songIndex].name,
                 queueSongs[songIndex].author,
                 queueSongs[songIndex].timeLength,
+                queueSongs[songIndex].cover,
                 true
             );
             if (result && result.song) {
@@ -987,25 +1026,21 @@ const onQueueSongAdd = async (hash, name, img, author) => {
     if (result && result.song) {
         await playSong(result.song);
     } else if (result && result.shouldPlayNext) {
-        console.log('[PlayerControl] 歌曲无法播放，3秒后自动切换到下一首');
-        autoSwitchTimer = setTimeout(() => {
-            playSongFromQueue('next');
-        }, 3000);
+        console.log('[PlayerControl] 歌曲无法播放');
+        handleAutoSwitch();
     }
 };
 
-const onQueueCloudSongAdd = async (hash, name, author, timeLength) => {
+const onQueueCloudSongAdd = async (hash, name, author, timeLength, cover) => {
     clearAutoSwitchTimer();
 
     console.log('[PlayerControl] 从播放队列收到addCloudMusicToQueue事件:', name);
-    const result = await addCloudMusicToQueue(hash, name, author, timeLength);
+    const result = await addCloudMusicToQueue(hash, name, author, timeLength, cover);
     if (result && result.song) {
         await playSong(result.song);
     } else if (result && result.shouldPlayNext) {
-        console.log('[PlayerControl] 云盘歌曲无法播放，3秒后自动切换到下一首');
-        autoSwitchTimer = setTimeout(() => {
-            playSongFromQueue('next');
-        }, 3000);
+        console.log('[PlayerControl] 云盘歌曲无法播放');
+        handleAutoSwitch();
     }
 };
 </script>

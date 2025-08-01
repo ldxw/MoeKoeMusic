@@ -71,6 +71,15 @@
                             </ul>
                         </div>
                     </div>
+                    <!-- 歌手歌曲排序选择 -->
+                    <div v-if="isArtist" class="sort-selector">
+                        <button class="sort-btn" :class="{ 'active': artistSortType === 'hot' }" @click="changeArtistSort('hot')">
+                            热门
+                        </button>
+                        <button class="sort-btn" :class="{ 'active': artistSortType === 'new' }" @click="changeArtistSort('new')">
+                            最新
+                        </button>
+                    </div>
                     <button class="view-mode-btn" @click="toggleViewMode" :title="viewMode === 'list' ? '切换到网格视图' : '切换到列表视图'">
                         <i class="fas" :class="viewMode === 'list' ? 'fa-th' : 'fa-list'"></i>
                     </button>
@@ -160,7 +169,6 @@ import { ref, onMounted, watch, onBeforeUnmount, computed } from 'vue';
 import { RecycleScroller } from 'vue3-virtual-scroller';
 import ContextMenu from '../components/ContextMenu.vue';
 import PlaylistSelectModal from '../components/PlaylistSelectModal.vue';
-import { ElMessage } from 'element-plus';
 import { get } from '../utils/request';
 import { useRoute, useRouter } from 'vue-router';
 import { MoeAuthStore } from '../stores/store';
@@ -216,6 +224,7 @@ const songs = ref([]);
 // 排序状态
 const sortField = ref('');
 const sortOrder = ref('asc');
+const artistSortType = ref('hot'); // 歌手歌曲排序类型：hot(热门) 或 new(最新)
 
 // 判断是否全选
 const isAllSelected = computed(() => {
@@ -301,7 +310,7 @@ const fetchArtistSongs = async () => {
     try {
         const firstPageResponse = await get('/artist/audios', {
             id: route.query.singerid,
-            sort: 'hot',
+            sort: artistSortType.value,
             page: currentPage,
             pagesize: pageSize.value
         });
@@ -336,7 +345,7 @@ const fetchArtistSongs = async () => {
         try {
             const response = await get('/artist/audios', {
                 id: route.query.singerid,
-                sort: 'hot',
+                sort: artistSortType.value,
                 page: currentPage,
                 pagesize: pageSize.value
             });
@@ -533,7 +542,7 @@ const toggleFavorite = async (id) => {
                 );
                 localStorage.setItem('collectedPlaylists', JSON.stringify(newCollectedPlaylists));
                 isPlaylistFavorited.value = false;
-                ElMessage.success('取消收藏成功');
+                $message.success('取消收藏成功');
             }
         } else {
             const response = await get('/playlist/add', { 
@@ -551,12 +560,12 @@ const toggleFavorite = async (id) => {
                 currentPlaylists.push(newPlaylist);
                 localStorage.setItem('collectedPlaylists', JSON.stringify(currentPlaylists));
                 isPlaylistFavorited.value = true;
-                ElMessage.success('收藏成功');
+                $message.success('收藏成功');
             }
         }
         localStorage.setItem('t', Date.now());
     } catch (error) {
-        ElMessage.error(isPlaylistFavorited.value ? t('qu-xiao-shou-cang-shi-bai') : t('shou-cang-shi-bai'));
+        $message.error(isPlaylistFavorited.value ? t('qu-xiao-shou-cang-shi-bai') : t('shou-cang-shi-bai'));
     }
 };
 
@@ -681,7 +690,7 @@ const appendSelectedToQueue = async () => {
     if (selectedTracks.value.length === 0) return;
     const selectedSongs = selectedTracks.value.map(index => filteredTracks.value[index]);
     await props.playerControl.addPlaylistToQueue(selectedSongs, true);
-    ElMessage.success('添加到播放列表成功');
+    $message.success('添加到播放列表成功');
     isBatchMenuVisible.value = false;
 };
 
@@ -714,9 +723,9 @@ const removeSelectedFromPlaylist = async () => {
             });
             filteredTracks.value = tracks.value;
             selectedTracks.value = [];
-            ElMessage.success('歌曲已从歌单中移除');
+            $message.success('歌曲已从歌单中移除');
         } catch (err) {
-            ElMessage.error('移除歌曲失败');
+            $message.error('移除歌曲失败');
             return;
         }
     }
@@ -780,6 +789,15 @@ const handleSongRemoved = (fileid) => {
 const toggleViewMode = () => {
     viewMode.value = viewMode.value === 'list' ? 'grid' : 'list';
     localStorage.setItem('trackViewMode', viewMode.value);
+};
+
+// 切换歌手歌曲排序方式
+const changeArtistSort = (sortType) => {
+    if (artistSortType.value !== sortType) {
+        artistSortType.value = sortType;
+        // 重新获取歌手歌曲
+        fetchArtistSongs();
+    }
 };
 </script>
 
@@ -1020,6 +1038,37 @@ const toggleViewMode = () => {
 
 .batch-actions-menu li:hover {
     background-color: #f0f0f0;
+}
+
+/* 排序选择器样式 */
+.sort-selector {
+    display: flex;
+    border: 1px solid var(--secondary-color);
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+.sort-btn {
+    background-color: transparent;
+    border: none;
+    padding: 5px 15px;
+    cursor: pointer;
+    color: var(--text-color);
+    transition: all 0.3s ease;
+    font-size: 14px;
+}
+
+.sort-btn:not(:last-child) {
+    border-right: 1px solid var(--secondary-color);
+}
+
+.sort-btn:hover {
+    background-color: rgba(var(--primary-color-rgb), 0.1);
+}
+
+.sort-btn.active {
+    background-color: var(--primary-color);
+    color: white;
 }
 
 .search-input {
