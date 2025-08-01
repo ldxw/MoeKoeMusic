@@ -23,9 +23,21 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code (for local source)
-        if: ${{ !github.event.inputs.use_remote }}
+      - name: Get default branch name
+        id: default_branch
+        run: |
+          # 获取仓库默认分支名称（通常是main或master）
+          DEFAULT_BRANCH=$(gh api repos/${{ github.repository }} --jq .default_branch)
+          echo "DEFAULT_BRANCH=$DEFAULT_BRANCH" >> $GITHUB_OUTPUT
+          echo "✅ 检测到默认分支: $DEFAULT_BRANCH"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout default branch code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.default_branch.outputs.DEFAULT_BRANCH }}  # 明确检出默认分支
+          fetch-depth: 1  # 浅克隆，仅获取最新提交
 
       - name: Set version and image tags
         id: vars
@@ -41,9 +53,10 @@ jobs:
 
       - name: Prepare source code
         run: |
-          set -euo pipefail  # 启用严格错误检查
+          set -euo pipefail
           USE_REMOTE=${{ github.event.inputs.use_remote }}
           VERSION=${{ github.event.inputs.version || 'v1.4.8' }}
+          DEFAULT_BRANCH=${{ steps.default_branch.outputs.DEFAULT_BRANCH }}
 
           if [ "$USE_REMOTE" == "true" ]; then
             echo "🔍 检查远程版本是否存在: $VERSION"
@@ -59,28 +72,35 @@ jobs:
             mv MoeKoeMusic-* src
             echo "SOURCE_CONTEXT=src" >> $GITHUB_ENV
           else
-            echo "📦 使用本地源码"
+            echo "📦 使用默认分支($DEFAULT_BRANCH)的本地源码"
             echo "SOURCE_CONTEXT=." >> $GITHUB_ENV
           fi
 
       - name: Show source structure (debug)
         run: |
-          echo "当前源码目录结构："
+          echo "当前源码目录结构（默认分支 ${{ steps.default_branch.outputs.DEFAULT_BRANCH }}）："
           echo "Source context: ${{ env.SOURCE_CONTEXT }}"
           ls -la ${{ env.SOURCE_CONTEXT }}
+          # 显示当前分支信息，确认是否在默认分支
+          echo "当前检出分支："
+          git branch --show-current
 
       - name: Check Dockerfile exists
         run: |
           set -euo pipefail
-          if [ ! -f "${{ env.SOURCE_CONTEXT }}/Dockerfile" ]; then
-            echo "❌ Dockerfile not found in ${{ env.SOURCE_CONTEXT }}"
-            echo "当前目录内容："
+          DOCKERFILE_PATH="${{ env.SOURCE_CONTEXT }}/Dockerfile"
+          
+          if [ ! -f "$DOCKERFILE_PATH" ]; then
+            echo "❌ Dockerfile not found in $DOCKERFILE_PATH"
+            echo "默认分支(${{ steps.default_branch.outputs.DEFAULT_BRANCH }})的根目录内容："
             ls -la ${{ env.SOURCE_CONTEXT }}
+            
+            # 尝试搜索仓库中是否有Dockerfile（递归查找）
+            echo "🔍 尝试在仓库中搜索Dockerfile..."
+            find . -name "Dockerfile" -print || echo "未找到任何Dockerfile"
             exit 1
           else
-            echo "✅ 找到Dockerfile"
-            # 可选：显示Dockerfile内容用于调试
-            # cat ${{ env.SOURCE_CONTEXT }}/Dockerfile
+            echo "✅ 找到Dockerfile: $DOCKERFILE_PATH"
           fi
 
       - name: Set up QEMU (for ARM emulation)
@@ -106,8 +126,8 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ${{ env.SOURCE_CONTEXT }}
-          # 如果Dockerfile不在根目录，取消注释并修改下面的路径
-          # file: ${{ env.SOURCE_CONTEXT }}/path/to/Dockerfile
+          # 如果Dockerfile不在根目录，根据find命令的结果修改下面的路径
+          # file: ${{ env.SOURCE_CONTEXT }}/path/to/found/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
@@ -115,6 +135,6 @@ jobs:
             ${{ steps.vars.outputs.TAG_DH_VERSION }}
             ${{ steps.vars.outputs.TAG_GHCR_LATEST }}
             ${{ steps.vars.outputs.TAG_GHCR_VERSION }}
-          # 启用缓存加速构建
           cache-from: type=gha
           cache-to: type=gha,mode=max
+    
